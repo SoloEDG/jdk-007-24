@@ -2,25 +2,32 @@ import type { Recorder } from "../model/recorder";
 export function RecordControls({
   state,
   canRecord,
+  locked,
   record,
   cancel,
   setGrid,
 }: {
   state: ReturnType<Recorder["snapshot"]>;
   canRecord: boolean;
+  locked: boolean;
   record: () => void;
   cancel: () => void;
   setGrid: (n: number) => void;
 }) {
+  const idle = state.status === "idle";
   return (
     <div className="record-controls">
       <button
-        className={`record ${state.status !== "idle" ? "recording" : ""}`}
-        disabled={!canRecord && state.status === "idle"}
-        onClick={state.status === "idle" ? record : cancel}
+        className={`record ${idle ? "" : "recording"}`}
+        disabled={!idle ? false : !canRecord || locked}
+        onClick={idle ? record : cancel}
       >
         <span />
-        {state.status === "idle" ? "录制循环" : "取消本次录制"}
+        {idle
+          ? "录制循环"
+          : state.status === "recovered"
+            ? "丢弃恢复的草稿"
+            : "取消本次录制"}
       </button>
       <label>
         吸附

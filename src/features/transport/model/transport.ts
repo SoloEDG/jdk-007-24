@@ -1,5 +1,6 @@
 import { clamp } from "@/shared/math";
 import { clockBeat, loopPosition } from "../lib/timing";
+import type { TransportSnapshot } from "@/shared/types";
 export function createTransport() {
   let bpm = 108,
     beats = 16,
@@ -20,8 +21,14 @@ export function createTransport() {
         position: loopPosition(abs, beats),
       };
     },
+    /** Musical position only — audio-clock seconds are never persisted. */
+    snapshot(now = 0): TransportSnapshot {
+      return { bpm, beats, beat: absolute(now), running };
+    },
     start(now: number) {
       if (running) return;
+      // A fresh anchor is established every time the transport starts, so a
+      // restored session never inherits the closed page's absolute seconds.
       anchor = now;
       cursor = offset;
       running = true;
@@ -35,6 +42,25 @@ export function createTransport() {
       running = false;
       offset = 0;
       cursor = 0;
+    },
+    /** Move to an absolute musical beat without starting playback. */
+    seek(beat: number) {
+      running = false;
+      offset = Math.max(0, Number.isFinite(beat) ? beat : 0);
+      cursor = offset;
+    },
+    /**
+     * Re-open a persisted position paused with a brand-new anchor. The
+     * scheduler cursor is parked at the saved beat, so notes that fell inside
+     * the closed period are never back-filled.
+     */
+    restore(state: TransportSnapshot) {
+      running = false;
+      bpm = clamp(Math.round(state.bpm), 40, 220);
+      beats = [4, 8, 16, 32].includes(state.beats) ? state.beats : 16;
+      offset = Math.max(0, Number.isFinite(state.beat) ? state.beat : 0);
+      anchor = 0;
+      cursor = offset;
     },
     configure(tempo: number, length: number) {
       this.stop();
